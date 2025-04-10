@@ -1,27 +1,24 @@
-import torch
-from torch import nn,save,load
-from torch.utils.data import DataLoader
-from torchvision import datasets, transforms
+import torch.nn as nn
 
-# Define the image classifier model
-class Classifier(nn.Module):
-    def __init__(self):
-        super(Classifier, self).__init__()
-        self.conv_layers = nn.Sequential(
-            nn.Conv2d(1, 32, kernel_size=3),
-            nn.ReLU(),
-            nn.Conv2d(32, 64, kernel_size=3),
-            nn.ReLU(),
-            nn.Conv2d(64, 64, kernel_size=3),
-            nn.ReLU()
-        )
-        self.fc_layers = nn.Sequential(
-            nn.Flatten(),
-            nn.Linear(64 * 22 * 22, 10)
-        )
+class NeuralNet(nn.Module):
+    def __init__(self, input_size: int, hidden_widths: list[int], num_classes: int):
+        super(NeuralNet, self).__init__()
+        self.input_size = input_size
+        previous_width = hidden_widths[0]
+        # create list of layers
+        self.layers = [nn.Linear(input_size, previous_width)]
+        for width in hidden_widths[1:-1]: 
+            self.layers.append(nn.Linear(previous_width, width))
+            previous_width = width
+        self.layers.append(nn.Linear(previous_width, num_classes))
+        self.layers = nn.ModuleList(self.layers)
+        self.activation = nn.ReLU()
 
     def forward(self, x):
-        x = self.conv_layers(x)
-        x = self.fc_layers(x)
+        for layer in self.layers[:-1]:
+            x = layer(x)
+            x = self.activation(x)
+        x = self.layers[-1](x)
+        # no softmax at the end
         return x
-
+    

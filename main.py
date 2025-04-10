@@ -1,52 +1,48 @@
-
-
 #Feed Forward Neural Network Trained and Tested on MNIST dataset
 import pprint
+import os
+from matplotlib.pylab import f
 import torch
 import torch.nn as nn
 import torchvision
 import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
 import pandas as pd
-import os
+import numpy as np
+from Predictor import NeuralNet
+from tqdm import tqdm
+from tqdm import trange
+
 
 # devicce config
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print("Using GPU") if torch.cuda.is_available() else print('Using CPU')
-
-
-class NeuralNet(nn.Module):
-    def __init__(self, input_size: int, hidden_size: int, num_hidden: int, num_classes: int):
-        super(NeuralNet, self).__init__()
-
-        self.input_size = input_size
-        
-        self.layers = [nn.Linear(input_size, hidden_size)]
-
-        for i in range(num_hidden-2): 
-            self.layers.append(nn.Linear(hidden_size, hidden_size))
-        
-        self.layers.append(nn.Linear(hidden_size, num_classes))
-        self.layers = nn.ModuleList(self.layers)
-        self.activation = nn.ReLU()
-
-    def forward(self, x):
-        for layer in self.layers[:-1]:
-            x = layer(x)
-            x = self.activation(x)
-        x = self.layers[-1](x)
-        # no softmax at the end
-        return x
-    
 
 def train_model(model: NeuralNet, num_epochs: int, train_loader, criterion, optimizer):
     accuracies = []
     losses = []
 
     data_length = len(train_loader.dataset)
+    acc = "-"
+    lss = "-"
+
+    bar = trange( # progress bar for training
+        num_epochs, 
+        desc="Training", 
+        unit="epoch", 
+        leave=True, 
+        total=num_epochs,
+        dynamic_ncols=True,
+        colour="green",
+        postfix= {"Acc": acc, "Loss": lss},
+        bar_format="{l_bar}{bar}| {postfix}",
+        unit_scale=True
+        )
+    
+    bar_step = 1/data_length # update progress bar every 1% of data length
+    
     #training loop
-    n_total_step = len(train_loader)
-    for epoch in range(num_epochs):
+    for epoch in bar:
         correct_predictions = 0
         loss_accumulator = 0
         for i, (images, labels) in enumerate(train_loader):
@@ -63,20 +59,22 @@ def train_model(model: NeuralNet, num_epochs: int, train_loader, criterion, opti
             loss_accumulator += loss.item()
             _, predicted = torch.max(outputs, 1)
             correct_predictions += (predicted == labels).sum().item()
-
+            
             #backward pass
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+            
+            bar.update(bar_step) # update progress bar
 
         epoch_accuracy = correct_predictions / data_length
         epoch_loss = loss_accumulator / data_length
-        
-        if epoch+1 % 5 == 0:
-            print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {epoch_loss}, Accuracy: {epoch_accuracy:.5f}")
-
         accuracies.append(epoch_accuracy) 
         losses.append(epoch_loss)
+        # update progress bar with new epoch accuracy and loss values
+        bar.set_postfix({"Acc": epoch_accuracy, "Loss": epoch_loss})
+    bar.close()
+    print(f"\nFinal Loss: {epoch_loss}, Final Accuracy: {epoch_accuracy:.5f}")
 
     return accuracies, losses
 
@@ -110,13 +108,17 @@ def save_csv(model, path):
         print(f"Model saved to: {os.getcwd()}\\{path}")
 
 
-def print_and_save(model):
+def print_and_save(model, dimensions):
     if input("See state dictionary of the model? (y/n): ").lower() == "y":
         print(f"\nState Dictionary Type: {type(model.state_dict())}")
         pprint.pp(model.state_dict())
 
     if input("Would you like to save this model? (y/n): ").lower() == "y":
-        save_csv(model, "params")
+        if input("Save as .pt or .csv? (pt/csv): ").lower() == "pt":
+            torch.save(model, f"model{dimensions}.pt")
+            print(f"Model saved to: {os.getcwd()}\\params.pt")
+        else:
+            save_csv(model, f"model{dimensions}.pt")
 
 
 def load_data(batch_size: int):
@@ -125,42 +127,52 @@ def load_data(batch_size: int):
     test_dataset = torchvision.datasets.MNIST(root='./data', train=False, transform=transforms.ToTensor())
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
-
     return train_loader, test_loader
+
+
+def plot_graphs(accuracies: list[float], losses: list[float], num_epochs: int):
+
+    fig, axis_1 = plt.subplots()
+    axis_1.set_xlabel('Epochs')
+    axis_1.set_ylabel('Accuracy')
+    x_axis = np.arange(1, num_epochs+1)
+    axis_1.plot(x_axis, accuracies, label='Accuracy', color='tab:blue')
+    axis_1.tick_params(axis='y', labelcolor='tab:blue')
+
+    axis_2 = axis_1.twinx()
+    axis_2.set_ylabel('Loss')
+    axis_2.plot(x_axis, losses, label='Loss', color='tab:orange')
+    axis_2.tick_params(axis='y', labelcolor='tab:orange')
+
+    fig.tight_layout()
+    plt.title('Training Accuracy and Loss')
+    plt.legend()
+    plt.show()
 
 
 def main():
     # hyperparameters
     input_size = 784  # 28x28
     num_classes = 10
-    hidden_size = 100
-    num_hidden = 4
+    hidden_widths = [100, 50]
     num_epochs = 20
     batch_size = 100
     learning_rate = 0.001
 
-    # load data
     train_loader, test_loader = load_data(batch_size)
 
-    # initialize model
-    model = NeuralNet(input_size, hidden_size, num_hidden, num_classes).to(device)
-
-    #Loss and Optimizer
+    model = NeuralNet(input_size, hidden_widths, num_classes).to(device)
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9)
 
-    # train model
-    accuracies, loss = train_model(model, num_epochs, train_loader, criterion, optimizer)
-
-    plt.plot(accuracies, label='Accuracy')
-    plt.plot(loss, label='Loss')
-    plt.xlabel('Epochs')
-    plt.ylabel('Value')
-    plt.title('Training Accuracy and Loss')
-    plt.show()
+    print("\nModel Loaded")
+    accuracies, losses = train_model(model, num_epochs, train_loader, criterion, optimizer)
+    
+    # display training accuracy and loss
+    plot_graphs(accuracies, losses, num_epochs)
 
     test_model(model, test_loader)
-    print_and_save(model)
+    print_and_save(model, hidden_widths)
 
 
 if __name__ == "__main__":
