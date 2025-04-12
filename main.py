@@ -109,9 +109,6 @@ def save_csv(model, path):
 
 
 def print_and_save(model, dimensions):
-    if input("See state dictionary of the model? (y/n): ").lower() == "y":
-        print(f"\nState Dictionary Type: {type(model.state_dict())}")
-        pprint.pp(model.state_dict())
 
     if input("Would you like to save this model? (y/n): ").lower() == "y":
         if input("Save as .pt or .csv? (pt/csv): ").lower() == "pt":
