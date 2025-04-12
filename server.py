@@ -5,11 +5,10 @@ from websockets.exceptions import ConnectionClosedOK
 from websockets.asyncio.server import serve
 from torch import nn, save, load
 from torch.utils.data import DataLoader
-from predictor import Classifier
+from Predictor import NeuralNet
 import matplotlib.pyplot as plt
 import numpy as np
 import cv2
-
 
 
 # handler coroutine

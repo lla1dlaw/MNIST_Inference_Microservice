@@ -1,0 +1,203 @@
+#Feed Forward Neural Network Trained and Tested on MNIST dataset
+import os
+from matplotlib.pylab import f
+import torch
+import torch.nn as nn
+import torchvision
+import torchvision.transforms as transforms
+import matplotlib.pyplot as plt
+import pandas as pd
+import numpy as np
+import pyinputplus as pyip
+from Predictor import NeuralNet
+from tqdm import tqdm
+
+# device config
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+print("Using GPU") if torch.cuda.is_available() else print('Using CPU')
+
+def train_model(model: NeuralNet, num_epochs: int, train_loader, criterion, optimizer):
+    accuracies = []
+    losses = []
+
+    data_length = len(train_loader.dataset)
+
+    # bar that needs to be implemented with threading to work efficiently
+    # bar = tqdm( # progress bar for training
+    #     range(num_epochs*data_length), 
+    #     desc="Training", 
+    #     unit="epoch", 
+    #     leave=False, 
+    #     total=num_epochs*data_length,
+    #     dynamic_ncols=True,
+    #     colour="green",
+    #     postfix=f"Acc: - Loss: -",
+    #     bar_format="{l_bar}{bar}{r_bar}{postfix}"
+    #     )
+    
+    bar = tqdm( # progress bar for training
+        range(num_epochs), 
+        desc="Training", 
+        unit="epoch", 
+        leave=False, 
+        total=num_epochs,
+        dynamic_ncols=True,
+        colour="green",
+        bar_format="{l_bar}{bar}{r_bar}{postfix}"
+        )
+    
+    #training loop
+    for epoch in range(num_epochs):
+        correct_predictions = 0
+        loss_accumulator = 0
+        for i, (images, labels) in enumerate(train_loader):
+            # (100, 1, 28, 28)
+            # (100, 784)
+            images = images.reshape(-1, 28*28).to(device)
+            labels = labels.to(device)
+
+            #forward pass
+            outputs = model(images)
+            loss = criterion(outputs, labels)
+            
+            # accumulate acuracy and loss
+            loss_accumulator += loss.item()
+            _, predicted = torch.max(outputs, 1)
+            correct_predictions += (predicted == labels).sum().item()
+            
+            #backward pass
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            
+            #bar.update(1) # update progress bar (uncomment with threadin is implemented)
+
+        bar.update(1)
+        epoch_accuracy = correct_predictions / data_length
+        epoch_loss = loss_accumulator / data_length
+        accuracies.append(epoch_accuracy) 
+        losses.append(epoch_loss)
+        # update progress bar with new epoch accuracy and loss values
+        #bar.set_postfix_str(f"Acc: {epoch_accuracy:.6f} Loss: {epoch_loss:.6f}")
+    
+    print(f"\nFinal Loss: {epoch_loss}, Final Accuracy: {epoch_accuracy:.5f}")
+    bar.close()
+    return accuracies, losses
+
+        
+def test_model(model, test_loader):
+    # Test the model
+    # In test phase, we don't need to compute gradients (for memory efficiency)
+    with torch.no_grad():
+        n_correct = 0
+        n_samples = 0
+        for images, labels in test_loader:
+            images = images.reshape(-1, 28*28).to(device)
+            labels = labels.to(device)
+            outputs = model(images)
+            # max returns (value ,index)
+            _, predicted = torch.max(outputs.data, 1)
+            n_samples += labels.size(0)
+            n_correct += (predicted == labels).sum().item()
+
+        acc = 100.0 * n_correct / n_samples
+        return acc
+
+
+
+def print_and_save(model, dimensions):
+    dims = "-".join([str(x) for x in dimensions])
+    filename = f"{dims}.pt"
+    save_path = os.path.join(os.getcwd(), "models", filename)
+    print(f"Save Path: {save_path}")
+    
+    os.makedirs(save_path, exist_ok=True)
+    
+    save = pyip.inputYesNo(prompt="Save Model? Note: This saves the full model object. (y/n): ", yesVal='y', noVal='n') == 'y'
+    if save:
+        torch.save(model, save_path)
+        print(f"Model saved to: {save_path}")
+        
+
+def load_data(batch_size: int):
+    # Load MNIST
+    try:
+        train_dataset = torchvision.datasets.MNIST(root='./data', train=True, transform=transforms.ToTensor(), download=True)
+        test_dataset = torchvision.datasets.MNIST(root='./data', train=False, transform=transforms.ToTensor())
+        train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+        test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+        return train_loader, test_loader
+    except Exception as e:
+        raise RuntimeError(f"Error loading MNIST dataset: {e}")
+
+
+def plot_graphs(accuracies: list[float], losses: list[float], num_epochs: int):
+
+    fig, axis_1 = plt.subplots()
+    axis_1.set_xlabel('Epochs')
+    axis_1.set_ylabel('Accuracy')
+    x_axis = np.arange(1, num_epochs+1)
+    axis_1.plot(x_axis, accuracies, label='Accuracy', color='tab:blue')
+    axis_1.tick_params(axis='y', labelcolor='tab:blue')
+
+    axis_2 = axis_1.twinx()
+    axis_2.set_ylabel('Loss')
+    axis_2.plot(x_axis, losses, label='Loss', color='tab:orange')
+    axis_2.tick_params(axis='y', labelcolor='tab:orange')
+
+    fig.tight_layout()
+    plt.title('Training Accuracy and Loss')
+    plt.legend()
+    plt.show()
+
+
+def get_network_dimensions() -> list[int]:
+    """Gets the dimensions of the network from the user.
+    The user is prompted to enter the number of neurons in each layer separated by commas.
+    Uses pyinputplus to validate the input.
+
+    Returns:
+        list[int]: List of integers representing the number of neurons in each layer.
+    """
+    dimensions = pyip.inputStr(prompt="Enter the number of neurons in each layer separated by commas (e.g. 100,50): ", allowRegexes=[r'^\d{1,3}(,\d{1,3})*$'])
+    dimensions = [int(x) for x in dimensions.split(',')]
+    return dimensions
+
+
+def main():
+    print("\n----------Welcome to the MNIST Neural Network Trainer----------\n")
+    print("- This program trains a feed forward neural network on the MNIST dataset.")
+    print("- Use the following prompts to train and save your models.\n")
+
+    # hyperparameters
+    input_size = 784  # 28x28
+    num_classes = 10
+    batch_size = 100
+    learning_rate = 0.001
+
+    train_loader, test_loader = load_data(batch_size)
+
+    while pyip.inputYesNo(prompt="Train a new model? (y/n): ", yesVal='y', noVal='n') == 'y':
+        hidden_widths = get_network_dimensions()
+        num_epochs = pyip.inputInt(prompt="How many epochs should we train for? (1-1000): ", min=1, max=1000)
+        print(f"\nTraining Parameters:\nInput Size: {input_size}\nNetwork Dimensions: {hidden_widths}\nBatch Size: {batch_size}\nLearning Rate: {learning_rate}\nEpochs: {num_epochs}\n")
+    
+        print(f"Initializing Model...")
+        model = NeuralNet(input_size, hidden_widths, num_classes).to(device)
+        criterion = nn.CrossEntropyLoss()
+        optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9)
+
+        print("\nModel Initialized.\n\nTraining Model...")
+        accuracies, losses = train_model(model, num_epochs, train_loader, criterion, optimizer)
+        
+        # display training accuracy and loss as a graph
+        print("\nModel Trained.\n\nDisplaying Training Accuracy and Loss Graph...")
+        plot_graphs(accuracies, losses, num_epochs)
+        print("\nTesting Model...")
+        test_acc = test_model(model, test_loader)
+        print(f'Accuracy of the network on the 10000 test images: {test_acc} %')
+        print_and_save(model, hidden_widths)
+
+
+if __name__ == "__main__":
+    main()

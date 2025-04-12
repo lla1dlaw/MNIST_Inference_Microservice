@@ -18,6 +18,7 @@ opt-einsum
 optree
 pandas
 pretty-errors
+pyinputplus
 python-mnist
 scikit-learn
 tensorboard
