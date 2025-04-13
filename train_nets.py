@@ -1,6 +1,7 @@
 #Feed Forward Neural Network Trained and Tested on MNIST dataset
 import os
 from matplotlib.pylab import f
+import test
 import torch
 import torch.nn as nn
 import torchvision
@@ -108,14 +109,14 @@ def test_model(model, test_loader):
 def print_and_save(model, dimensions):
     dims = "-".join([str(x) for x in dimensions])
     filename = f"{dims}.pt"
-    save_path = os.path.join(os.getcwd(), "models", filename)
+    save_path = os.path.join("models")
     print(f"Save Path: {save_path}")
     
     os.makedirs(save_path, exist_ok=True)
     
     save = pyip.inputYesNo(prompt="Save Model? Note: This saves the full model object. (y/n): ", yesVal='y', noVal='n') == 'y'
     if save:
-        torch.save(model, save_path)
+        torch.save(model, os.path.join(save_path, filename))
         print(f"Model saved to: {save_path}")
         
 
@@ -159,8 +160,13 @@ def get_network_dimensions() -> list[int]:
     Returns:
         list[int]: List of integers representing the number of neurons in each layer.
     """
-    dimensions = pyip.inputStr(prompt="Enter the number of neurons in each layer separated by commas (e.g. 100,50): ", allowRegexes=[r'^\d{1,3}(,\d{1,3})*$'])
-    dimensions = [int(x) for x in dimensions.split(',')]
+    dimensions = []
+    num_layers = pyip.inputInt(prompt="How many layers should the network have? (1-10): ", min=1, max=10)
+
+    for i in range(num_layers):
+        layer_width = pyip.inputInt(prompt=f"\tHow many neurons in layer {i+1}? (1-1000): ", min=1, max=1000)
+        dimensions.append(layer_width)
+
     return dimensions
 
 
@@ -172,7 +178,7 @@ def main():
     # hyperparameters
     input_size = 784  # 28x28
     num_classes = 10
-    batch_size = 100
+    batch_size = 1000
     learning_rate = 0.001
 
     train_loader, test_loader = load_data(batch_size)
