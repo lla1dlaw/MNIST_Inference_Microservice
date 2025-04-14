@@ -7,93 +7,87 @@ import torch.nn as nn
 import torchvision
 import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
-import pandas as pd
 import numpy as np
 import pyinputplus as pyip
-from Predictor import NeuralNet
+from Predictor import NeuralNet, CNN
 from tqdm import tqdm
 
 # device config
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print("Using GPU") if torch.cuda.is_available() else print('Using CPU')
 
-def train_model(model: NeuralNet, num_epochs: int, train_loader, criterion, optimizer):
+def train_model(model: NeuralNet, num_epochs: int, train_loader, criterion, optimizer, is_cnn: bool):
+    keep_training = True
     accuracies = []
     losses = []
-
     data_length = len(train_loader.dataset)
+    epochs = num_epochs
 
-    # bar that needs to be implemented with threading to work efficiently
-    # bar = tqdm( # progress bar for training
-    #     range(num_epochs*data_length), 
-    #     desc="Training", 
-    #     unit="epoch", 
-    #     leave=False, 
-    #     total=num_epochs*data_length,
-    #     dynamic_ncols=True,
-    #     colour="green",
-    #     postfix=f"Acc: - Loss: -",
-    #     bar_format="{l_bar}{bar}{r_bar}{postfix}"
-    #     )
-    
-    bar = tqdm( # progress bar for training
-        range(num_epochs), 
-        desc="Training", 
-        unit="epoch", 
-        leave=False, 
-        total=num_epochs,
-        dynamic_ncols=True,
-        colour="green",
-        bar_format="{l_bar}{bar}{r_bar}{postfix}"
-        )
-    
-    #training loop
-    for epoch in range(num_epochs):
-        correct_predictions = 0
-        loss_accumulator = 0
-        for i, (images, labels) in enumerate(train_loader):
-            # (100, 1, 28, 28)
-            # (100, 784)
-            images = images.reshape(-1, 28*28).to(device)
-            labels = labels.to(device)
+    while keep_training:
+        bar = tqdm( # progress bar for training
+            range(epochs), 
+            desc="Training", 
+            unit="epoch", 
+            leave=False, 
+            total=epochs,
+            dynamic_ncols=True,
+            colour="green",
+            bar_format="{l_bar}{bar}{r_bar}{postfix}"
+            )
+        
 
-            #forward pass
-            outputs = model(images)
-            loss = criterion(outputs, labels)
-            
-            # accumulate acuracy and loss
-            loss_accumulator += loss.item()
-            _, predicted = torch.max(outputs, 1)
-            correct_predictions += (predicted == labels).sum().item()
-            
-            #backward pass
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-            
-            #bar.update(1) # update progress bar (uncomment with threadin is implemented)
+        #training loop
+        for epoch in range(epochs):
+            correct_predictions = 0
+            loss_accumulator = 0
+            for i, (images, labels) in enumerate(train_loader):
+                # (100, 1, 28, 28)
+                # (100, 784)
+                if not is_cnn:
+                    images = images.reshape(-1, 28*28)
+                images = images.to(device)
+                labels = labels.to(device)
 
-        bar.update(1)
-        epoch_accuracy = correct_predictions / data_length
-        epoch_loss = loss_accumulator / data_length
-        accuracies.append(epoch_accuracy) 
-        losses.append(epoch_loss)
-        # update progress bar with new epoch accuracy and loss values
-        #bar.set_postfix_str(f"Acc: {epoch_accuracy:.6f} Loss: {epoch_loss:.6f}")
-    
-    print(f"\nFinal Loss: {epoch_loss}, Final Accuracy: {epoch_accuracy:.5f}")
-    bar.close()
+                #forward pass
+                outputs = model(images)
+                loss = criterion(outputs, labels)
+                
+                # accumulate acuracy and loss
+                loss_accumulator += loss.item()
+                _, predicted = torch.max(outputs, 1)
+                correct_predictions += (predicted == labels).sum().item()
+                
+                #backward pass
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+                
+            bar.update(1)
+            epoch_accuracy = correct_predictions / data_length
+            epoch_loss = loss_accumulator / data_length
+            accuracies.append(epoch_accuracy) 
+            losses.append(epoch_loss)
+            
+        print(f"\nFinal Loss: {epoch_loss}, Final Accuracy: {epoch_accuracy:.5f}")
+        bar.close()
+
+        keep_training = pyip.inputYesNo("Continue Training? (y/n):") == 'yes'
+        if keep_training:
+            epochs = pyip.inputInt("How many additional epochs should we train for? (1-1000): ", min=1, max=1000)
+
     return accuracies, losses
 
-        
-def test_model(model, test_loader):
+    
+def test_model(model, test_loader, is_cnn: bool):
     # Test the model
     # In test phase, we don't need to compute gradients (for memory efficiency)
     with torch.no_grad():
         n_correct = 0
         n_samples = 0
         for images, labels in test_loader:
-            images = images.reshape(-1, 28*28).to(device)
+            if not is_cnn:
+                images = images.reshape(-1, 28*28)
+            images = images.to(device)
             labels = labels.to(device)
             outputs = model(images)
             # max returns (value ,index)
@@ -105,8 +99,7 @@ def test_model(model, test_loader):
         return acc
 
 
-
-def print_and_save(model, dimensions):
+def print_and_save(model, dimensions = None, is_cnn = False):
     dims = "-".join([str(x) for x in dimensions])
     filename = f"{dims}.pt"
     save_path = os.path.join("models")
@@ -123,13 +116,16 @@ def print_and_save(model, dimensions):
 def load_data(batch_size: int):
     # Load MNIST
     try:
-        train_dataset = torchvision.datasets.MNIST(root='./data', train=True, transform=transforms.ToTensor(), download=True)
-        test_dataset = torchvision.datasets.MNIST(root='./data', train=False, transform=transforms.ToTensor())
-        train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-        test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
-        return train_loader, test_loader
+        # train_dataset = torchvision.datasets.MNIST(root='./data', train=True, transform=transforms.ToTensor(), download=True)
+        # test_dataset = torchvision.datasets.MNIST(root='./data', train=False, transform=transforms.ToTensor(), download=True)
+        train_dataset = torchvision.datasets.EMNIST(root='./data', split='digits', train=True, transform=transforms.ToTensor(), download=True)
+        test_dataset = torchvision.datasets.EMNIST(root='./data', split='digits', train=False, transform=transforms.ToTensor(), download=True)
     except Exception as e:
         raise RuntimeError(f"Error loading MNIST dataset: {e}")
+    
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+    return train_loader, test_loader
 
 
 def plot_graphs(accuracies: list[float], losses: list[float], num_epochs: int):
@@ -184,25 +180,36 @@ def main():
     train_loader, test_loader = load_data(batch_size)
 
     while pyip.inputYesNo(prompt="Train a new model? (y/n): ", yesVal='y', noVal='n') == 'y':
-        hidden_widths = get_network_dimensions()
+        # get the type of NN to train
+        train_cnn = pyip.inputMenu(["linear", "cnn"], "Which type of network do you want to train? (Enter the number of your choice):\n", numbered=True) == "cnn"
+        if train_cnn:
+            print(f"Initializing Model...")
+            model = CNN().to(device)
+            print("\nModel Initialized.")
+        else: 
+            hidden_widths = get_network_dimensions()
+            print(f"\nTraining Parameters:\nInput Size: {input_size}\nNetwork Dimensions: {hidden_widths}\nBatch Size: {batch_size}\nLearning Rate: {learning_rate}\nEpochs: {num_epochs}\n")
+            print(f"Initializing Model...")
+            model = NeuralNet(input_size, hidden_widths, num_classes).to(device)
+            print("\nModel Initialized.")
+
         num_epochs = pyip.inputInt(prompt="How many epochs should we train for? (1-1000): ", min=1, max=1000)
-        print(f"\nTraining Parameters:\nInput Size: {input_size}\nNetwork Dimensions: {hidden_widths}\nBatch Size: {batch_size}\nLearning Rate: {learning_rate}\nEpochs: {num_epochs}\n")
-    
-        print(f"Initializing Model...")
-        model = NeuralNet(input_size, hidden_widths, num_classes).to(device)
         criterion = nn.CrossEntropyLoss()
         optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9)
 
-        print("\nModel Initialized.\n\nTraining Model...")
-        accuracies, losses = train_model(model, num_epochs, train_loader, criterion, optimizer)
+        print("Training Model...")
+        accuracies, losses = train_model(model, num_epochs, train_loader, criterion, optimizer, train_cnn)
         
         # display training accuracy and loss as a graph
-        print("\nModel Trained.\n\nDisplaying Training Accuracy and Loss Graph...")
-        plot_graphs(accuracies, losses, num_epochs)
+        # print("\nModel Trained.\n\nDisplaying Training Accuracy and Loss Graph...")
+        # plot_graphs(accuracies, losses, num_epochs)
         print("\nTesting Model...")
-        test_acc = test_model(model, test_loader)
+        test_acc = test_model(model, test_loader, train_cnn)
         print(f'Accuracy of the network on the 10000 test images: {test_acc} %')
-        print_and_save(model, hidden_widths)
+        if not train_cnn:
+            print_and_save(model, dimensions=hidden_widths, is_cnn=train_cnn)
+        else:
+            print_and_save(model, is_cnn=train_cnn)
 
 
 if __name__ == "__main__":
