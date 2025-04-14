@@ -100,8 +100,11 @@ def test_model(model, test_loader, is_cnn: bool):
 
 
 def print_and_save(model, dimensions = None, is_cnn = False):
-    dims = "-".join([str(x) for x in dimensions])
-    filename = f"{dims}.pt"
+    if not is_cnn:
+        dims = "-".join([str(x) for x in dimensions])
+        filename = f"{dims}.pt"
+    else:
+        filename = "cnn.pt"
     save_path = os.path.join("models")
     print(f"Save Path: {save_path}")
     
