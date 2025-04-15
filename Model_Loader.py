@@ -44,7 +44,7 @@ class Loader:
                 # load model
                 model = CNN()
             else:
-                hidden_widths = [int(width) for width in filename_no_ext.split("-")]
+                hidden_widths = [int(width) for width in filename_no_ext.rstrip("-dict").split("-")]
                 model = NeuralNet(input_size=28*28, hidden_widths=hidden_widths, num_classes=10)
 
             # load model state dictionary

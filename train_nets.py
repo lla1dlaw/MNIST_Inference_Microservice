@@ -9,7 +9,9 @@ import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
 import numpy as np
 import pyinputplus as pyip
+import Model_Loader
 from Predictor import NeuralNet, CNN
+from Model_Loader import Loader
 from tqdm import tqdm
 
 # device config
@@ -189,9 +191,14 @@ def get_network_dimensions() -> list[int]:
 
 
 def main():
+
+
     print("\n----------Welcome to the MNIST Neural Network Trainer----------\n")
     print("- This program trains a feed forward neural network on the MNIST dataset.")
     print("- Use the following prompts to train and save your models.\n")
+
+    print(Loader("model_dicts", device=device, from_dicts=True).models)
+
 
     # hyperparameters
     input_size = 784  # 28x28
@@ -236,6 +243,7 @@ def main():
     save_full_models = pyip.inputYesNo("Save previous trained models? (y/n): ", yesVal='y', noVal='n') == 'y'
     if save_full_models:
         load_save_all_state_dicts()
+
 
 if __name__ == "__main__":
     main()
