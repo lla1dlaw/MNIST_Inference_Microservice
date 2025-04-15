@@ -1,7 +1,6 @@
 #Feed Forward Neural Network Trained and Tested on MNIST dataset
 import os
 from matplotlib.pylab import f
-import test
 import torch
 import torch.nn as nn
 import torchvision
@@ -9,7 +8,6 @@ import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
 import numpy as np
 import pyinputplus as pyip
-import Model_Loader
 from Predictor import NeuralNet, CNN
 from Model_Loader import Loader
 from tqdm import tqdm
