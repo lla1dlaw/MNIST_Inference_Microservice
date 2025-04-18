@@ -1,3 +1,8 @@
+""" 
+Author: Liam Laidlaw
+Filename: train_nets.py
+Purpose: Trains and saves various types of torch based neural networks through an interactive CLI. 
+"""
 #Feed Forward Neural Network Trained and Tested on MNIST dataset
 import os
 from matplotlib.pylab import f
@@ -8,8 +13,8 @@ import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
 import numpy as np
 import pyinputplus as pyip
-from Predictor import NeuralNet, CNN
-from Model_Loader import Loader
+from MNISTPredictor.Predictor import NeuralNet, CNN
+from MNISTPredictor.Model_Loader import Loader
 from tqdm import tqdm
 
 # device config

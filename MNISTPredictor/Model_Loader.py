@@ -5,7 +5,7 @@ Purpose: Loads custom torch models into a dictionary
 
 import torch
 import os
-from Predictor import NeuralNet, CNN
+from MNISTPredictor.Predictor import NeuralNet, CNN
 
 
 class Loader:
