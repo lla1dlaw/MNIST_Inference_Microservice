@@ -13,8 +13,8 @@ import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
 import numpy as np
 import pyinputplus as pyip
-from MNISTPredictor.Predictor import NeuralNet, CNN
-from MNISTPredictor.Model_Loader import Loader
+from Predictor import NeuralNet, CNN
+from Model_Loader import Loader
 from tqdm import tqdm
 
 # device config

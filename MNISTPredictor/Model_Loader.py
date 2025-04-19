@@ -3,9 +3,12 @@ Filename: Model_Loader.py
 Purpose: Loads custom torch models into a dictionary
 """
 
+from matplotlib.style import available
 import torch
 import os
-from MNISTPredictor.Predictor import NeuralNet, CNN
+from Predictor import NeuralNet, CNN
+import numpy as np
+import random
 
 
 class Loader:
@@ -36,7 +39,7 @@ class Loader:
         Returns: Dictionary with model dimensions separated by "-" as keys and models as values
         """
         res = {}
-
+        
         for filename in os.listdir(models_dir):
             load_path = os.path.join(models_dir, filename)
             filename_no_ext = os.path.splitext(filename)[0]
@@ -80,6 +83,48 @@ class Loader:
             res[key] = model
 
         return res
+    
+
+    def get_available_models(self):
+        return list(self.models.keys())
+
+
+    def infer(self, model: str, data: list[int]) -> int:
+        # ensure that data is in the proper type
+        if not isinstance(data[0], int):
+            input_data = [int(x) for x in data]
+
+        input_data = np.array(data)
+        
+        if not "cnn" in model:
+            input_data = torch.from_numpy(input_data)
+        else:
+            input_data = input_data.reshape(28, 28)
+
+        output = self.models[model](input_data)
+        predicted = torch.argmax(output).item()
+        return predicted
+    
+
+def main():
+    loader = Loader(os.path.join("MNISTPredictor", "model_dicts"))
+
+    inp = [random.randint(0, 255) for _ in range(28*28)]
+    inp = torch.Tensor(inp)
+
+    outputs = []
+    
+    for model in loader.models.keys():
+        val = loader.infer(model, inp)
+        outputs.append(val)
+    
+    print(f"Output Types: {type(outputs[0])}")
+    print(f"Outputs: {outputs}")
+    
+
+if __name__ == "__main__":
+    main()
+
 
 
 

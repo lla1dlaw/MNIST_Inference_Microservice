@@ -5,12 +5,16 @@ Purpose: Flask microservice for predicting handwritten digits.
 """
 
 import json
+import os
 from flask import  request, jsonify
-from MNISTPredictor import app, models
-from flask_restplus import Api, Resource
+from flask import Flask
+from Model_Loader import Loader
+
+app = Flask(__name__)
+models = Loader(os.path.join("MNISTPredictor", "model_dicts"))
 
 
-@app.route('/get_inference', methods=["POST"])
+@app.route('/infer', methods=["POST"])
 def get_inference():
     try:
         if not request.is_json:
@@ -20,21 +24,28 @@ def get_inference():
             }), 400
         
         # pull the model type and input image from the request body
-        model_key = request.form['model']
-        image = request.form['image']
+        data = request.get_json()
+        model_key = data['model']
+        image = data['image']
 
-        print(model_key)
-        print(image)
-        # if not "cnn" in model_key: # ensure that the model is expecting flat data (convert to 2d for conv NN)
-        #     res = models[model_key]()
-        # else:
-        #     ...
+        prediction = models.infer(model_key, image)
+        return jsonify({
+            'prediction': str(prediction)
+        }), 200
 
-    # except json.JSONDecoder:
-    #     return jsonify({
-    #         'error': 'Invalid JSON Format',
-    #         'status': 'error'
-    #     }), 500
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'status': 'error'
+        }), 500
+    
+
+@app.route('/get_available_models', methods=['GET'])
+def get_available_models():
+    try:
+        return jsonify({
+            "available_models": models.get_available_models()
+        }), 200
     
     except Exception as e:
         return jsonify({
@@ -45,7 +56,7 @@ def get_inference():
 
 def main():
     print("Starting MNSIT Microservice...")
-    app.run(port=8000)
+    app.run(port=8001, debug=True)
     
 
 if __name__ == "__main__":
