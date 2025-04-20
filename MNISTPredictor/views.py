@@ -31,11 +31,9 @@ def get_inference():
         prediction = models.infer(model_key, image)
         activations = models.get_activations(model_key)
 
-        print(f"Prediction: {prediction}")
-        print(f"Activations: \n{activations}")
         return jsonify({
             'prediction': str(prediction),
-            'activation': activations
+            'activations': activations
         }), 200
 
     except Exception as e:
@@ -60,7 +58,6 @@ def get_available_models():
 
 
 def main():
-    print("Starting MNSIT Microservice...")
     app.run(port=8001)
     
 
