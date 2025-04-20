@@ -2,13 +2,14 @@
 Filename: Model_Loader.py
 Purpose: Loads custom torch models into a dictionary
 """
-
-from matplotlib.style import available
+import cv2
 import torch
 import os
 from Predictor import NeuralNet, CNN
 import numpy as np
 import random
+import math
+import traceback
 
 
 class Loader:
@@ -20,7 +21,6 @@ class Loader:
             device (torch.device): the device to load the models onto
             from_dicts (bool, optional): Whether the saved models are state dictionaries or full models. Defaults to True.
         """
-
         self.models = None # stores the all the loaded models
         self.models_dir= os.path.join(models_dir)
 
@@ -87,24 +87,46 @@ class Loader:
 
     def get_available_models(self):
         return list(self.models.keys())
+    
 
+    def _image_preprocess(self, arr: np.ndarray, make_2d: bool) -> np.ndarray:
+        print(f"Originial Array Size: {arr.size}")
+        dims = int(math.sqrt(arr.size))
+        image = arr.reshape(dims, dims)
+        print(f"Image Shape: {image.shape}")
+        resized_image = cv2.resize(image, (28, 28))
+        resized_image = np.array(resized_image, dtype=np.float32)
+        print(f"Resized Image Shape: {resized_image.shape}")
+        if make_2d:
+            return torch.from_numpy(resized_image)
+        return torch.from_numpy(resized_image.flatten())
 
     def infer(self, model: str, data: list[int]) -> int:
-        # ensure that data is in the proper type
-        if not isinstance(data[0], int):
-            input_data = [int(x) for x in data]
 
-        input_data = np.array(data)
-        
-        if not "cnn" in model:
-            input_data = torch.from_numpy(input_data)
-        else:
-            input_data = input_data.reshape(28, 28)
+        make_2d = "cnn" in model
+        try:
+            # ensure that data is in the proper type
+            if not isinstance(data[0], int):
+                input_data = np.array([int(x) for x in data], dtype=np.uint8)
+            else:
+                input_data = np.array(data, dtype=np.uint8)
 
-        output = self.models[model](input_data)
-        predicted = torch.argmax(output).item()
-        return predicted
+            input_data = self._image_preprocess(np.array(input_data), make_2d)
+            output = self.models[model](input_data)
+            predicted = torch.argmax(output).item()
+            return predicted
+        except TypeError as e:
+            print(f"Type Error: {e}")
+            print(traceback.format_exc())
+            return -1
+        except Exception:
+            print(traceback.format_exc())
+            return -1
     
+
+    def get_activations(self, model: str):
+        return self.models[model].get_activations()
+
 
 def main():
     loader = Loader(os.path.join("MNISTPredictor", "model_dicts"))
